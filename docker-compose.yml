@@ -1,0 +1,83 @@
+services:
+    ollama:
+      image: ollama/ollama:latest
+      container_name: ollama
+      ports:
+        - "11434:11434"
+      volumes:
+        - ollama_data:/root/.ollama
+      restart: unless-stopped
+      environment:
+        - OLLAMA_HOST=0.0.0.0
+      entrypoint: >
+        sh -c "ollama serve & sleep 5 && ollama pull llama3 && wait"
+      networks:
+        - network
+
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: app
+        restart: unless-stopped
+        ports:
+            - "5173:5173"
+        env_file:
+            - .env
+        volumes:
+            - ./:/var/www/html
+            - /var/www/html/node_modules
+            - /var/www/html/vendor
+        depends_on:
+            - mysql
+            - ollama
+        networks:
+            - network
+
+    nginx:
+        image: nginx:stable-alpine
+        container_name: nginx
+        restart: unless-stopped
+        ports:
+            - "8000:80"
+        volumes:
+            - ./:/var/www/html
+            - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+        depends_on:
+            - app
+        networks:
+            - network
+
+    mysql:
+        image: mysql:8.0
+        container_name: mysql
+        restart: unless-stopped
+        env_file:
+            - .env
+        environment:
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_USER: ${DB_USERNAME}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_ALLOW_EMPTY_PASSWORD: "no"
+        ports:
+            - "${DB_PORT:-3306}:3306"
+        volumes:
+            - mysql-data:/var/lib/mysql
+            - ./docker/mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
+        security_opt:
+            - no-new-privileges:true
+        networks:
+            - network
+
+networks:
+    network:
+        driver: bridge
+
+volumes:
+    mysql-data:
+        driver: local
+    redis-data:
+        driver: local
+    ollama_data:
+      driver: local
