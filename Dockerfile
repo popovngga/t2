@@ -27,10 +27,14 @@ RUN npm ci
 
 COPY . .
 
+RUN usermod -u 1001 www-data && groupmod -g 1001 www-data
+
 RUN composer dump-autoload --optimize
 RUN chown -R www-data:www-data storage bootstrap/cache
 
 COPY ./docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+USER www-data
 
 ENTRYPOINT ["docker-entrypoint.sh"]
